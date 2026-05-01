@@ -3,126 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Private Block Editor</title>
+    <title>BlockMaster OS</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        .block-item:hover .block-controls { opacity: 1; }
-        [contenteditable="true"]:focus { outline: none; border-left: 2px solid #3b82f6; padding-left: 10px; }
-        .drag-handle { cursor: grab; }
+        body { font-family: 'Inter', sans-serif; }
+        .block-wrapper:hover .controls { opacity: 1; transform: translateX(0); }
+        .controls { opacity: 0; transform: translateX(-10px); transition: all 0.2s; }
+        [contenteditable="true"]:focus { outline: none; box-shadow: inset 0 -2px 0 #3b82f6; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-100 min-h-screen">
 
-    <!-- Admin Bar -->
-    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 flex justify-between items-center px-6 shadow-lg">
+    <!-- Admin Control Panel -->
+    <nav class="glass border-b border-slate-200 p-4 sticky top-0 z-50 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-4">
-            <span class="font-bold tracking-widest text-blue-400">BLOCK_EDIT</span>
-            <span id="status-tag" class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-400">VIEW ONLY</span>
+            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200">B</div>
+            <h1 class="font-extrabold text-slate-800 tracking-tight">BLOCK<span class="text-blue-600">MASTER</span></h1>
         </div>
-        
-        <div class="flex gap-3">
-            <button id="lock-btn" onclick="toggleLock()" class="bg-slate-700 hover:bg-slate-600 px-4 py-1 rounded text-sm transition">Unlock to Edit</button>
-            <button id="save-btn" onclick="saveData()" class="hidden bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded text-sm font-bold">Save Page</button>
+
+        <div id="admin-tools" class="hidden flex items-center gap-4">
+            <div class="h-6 w-[1px] bg-slate-300 mx-2"></div>
+            <button onclick="addBlock('text')" class="hover:text-blue-600 font-medium text-sm text-slate-500">+ Text</button>
+            <button onclick="addBlock('image')" class="hover:text-blue-600 font-medium text-sm text-slate-500">+ Image</button>
+            <button onclick="addBlock('button')" class="hover:text-blue-600 font-medium text-sm text-slate-500">+ Button</button>
+            <button onclick="publish()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-bold shadow-md transition-all active:scale-95">Publish to Web</button>
         </div>
+
+        <button id="auth-btn" onclick="authenticate()" class="bg-slate-800 text-white px-5 py-2 rounded-full text-sm font-bold">Admin Login</button>
     </nav>
 
-    <!-- Block Toolbar (Hidden by default) -->
-    <div id="toolbar" class="hidden bg-white border-b border-slate-200 p-2 sticky top-[52px] z-40 justify-center gap-2 shadow-sm">
-        <button onclick="addBlock('h2')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Heading</button>
-        <button onclick="addBlock('p')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Paragraph</button>
-        <button onclick="addBlock('img')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Image URL</button>
-        <button onclick="clearAll()" class="px-3 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded text-sm">Clear All</button>
+    <!-- Canvas Area -->
+    <div id="main-canvas" class="max-w-4xl mx-auto py-20 px-6 space-y-8">
+        <!-- Dynamic Blocks Loaded Here -->
     </div>
 
-    <!-- Main Content -->
-    <div id="canvas" class="max-w-3xl mx-auto mt-12 p-6 min-h-screen">
-        <!-- Blocks will be injected here -->
-    </div>
-
+    <!-- Scripting Logic -->
     <script>
-        let isLocked = true;
-        const canvas = document.getElementById('canvas');
-        const lockBtn = document.getElementById('lock-btn');
-        const saveBtn = document.getElementById('save-btn');
-        const toolbar = document.getElementById('toolbar');
-        const statusTag = document.getElementById('status-tag');
+        let isAdmin = false;
+        const SECRET = "admin123"; // Change this!
 
-        // Simple "Secret" - Change 'admin123' to your preferred password
-        const SECRET_KEY = "admin123";
-
-        function toggleLock() {
-            if (isLocked) {
-                const pass = prompt("Enter Admin Password:");
-                if (pass === SECRET_KEY) {
-                    isLocked = false;
-                    unlockEditor();
-                } else {
-                    alert("Access Denied");
-                }
+        function authenticate() {
+            const pass = prompt("Enter Master Password:");
+            if (pass === SECRET) {
+                isAdmin = true;
+                document.getElementById('admin-tools').classList.remove('hidden');
+                document.getElementById('auth-btn').innerText = "Logout";
+                document.getElementById('auth-btn').onclick = () => location.reload();
+                refreshEditorState();
             } else {
-                isLocked = true;
-                lockEditor();
+                alert("Unauthorized Access.");
             }
         }
 
-        function unlockEditor() {
-            lockBtn.innerText = "Lock Editor";
-            lockBtn.classList.replace('bg-slate-700', 'bg-red-900');
-            saveBtn.classList.remove('hidden');
-            toolbar.classList.add('flex');
-            statusTag.innerText = "EDIT MODE";
-            statusTag.classList.replace('bg-slate-700', 'bg-green-900');
-            statusTag.classList.replace('text-slate-400', 'text-green-100');
+        function addBlock(type) {
+            const canvas = document.getElementById('main-canvas');
+            const wrapper = document.createElement('div');
+            wrapper.className = "block-wrapper relative group p-4 rounded-2xl hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-slate-100";
             
-            document.querySelectorAll('.editable').forEach(el => el.contentEditable = true);
-        }
-
-        function lockEditor() {
-            location.reload(); // Simplest way to reset state
-        }
-
-        function addBlock(type, content = "") {
-            const div = document.createElement('div');
-            div.className = "block-item group relative mb-4";
-            
-            let innerHTML = "";
-            if (type === 'h2') innerHTML = `<h2 class="editable text-3xl font-bold" contenteditable="true">${content || "New Heading"}</h2>`;
-            if (type === 'p') innerHTML = `<p class="editable text-slate-600 leading-relaxed" contenteditable="true">${content || "Type your story here..."}</p>`;
-            if (type === 'img') {
-                const url = content || prompt("Enter Image URL:", "https://images.unsplash.com/photo-1498050108023-c5249f4df085");
-                innerHTML = `<img src="${url}" class="rounded-xl shadow-lg my-4 w-full">`;
+            let content = "";
+            if (type === 'text') {
+                content = `<h2 contenteditable="true" class="text-3xl font-bold text-slate-800 mb-2">Heading</h2>
+                           <p contenteditable="true" class="text-slate-500 leading-relaxed text-lg">Click to write something amazing...</p>`;
+            } else if (type === 'image') {
+                const url = prompt("Image URL:", "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80");
+                content = `<img src="${url}" class="w-full h-auto rounded-2xl shadow-lg border border-slate-200">`;
+            } else if (type === 'button') {
+                content = `<div class="flex justify-center py-4">
+                             <a href="#" contenteditable="true" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-blue-200 shadow-lg hover:scale-105 transition-transform">Click Me</a>
+                           </div>`;
             }
 
-            div.innerHTML = `
-                ${innerHTML}
-                <div class="block-controls opacity-0 absolute -left-12 top-0 flex flex-col gap-1 transition-opacity">
-                    <button onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-600 text-xs">Del</button>
+            wrapper.innerHTML = `
+                <div class="controls absolute -left-16 top-1/2 -translate-y-1/2 flex flex-col gap-2">
+                    <button onclick="this.closest('.block-wrapper').remove()" class="w-10 h-10 bg-white shadow-md rounded-full flex items-center justify-center text-red-500 hover:bg-red-50">✕</button>
                 </div>
+                <div class="content-area">${content}</div>
             `;
-            canvas.appendChild(div);
+            canvas.appendChild(wrapper);
         }
 
-        function saveData() {
-            const data = canvas.innerHTML;
-            localStorage.setItem('saved_blocks', data);
-            alert("Site layout saved locally!");
+        function refreshEditorState() {
+            const editables = document.querySelectorAll('[contenteditable]');
+            editables.forEach(el => el.contentEditable = isAdmin);
         }
 
-        function clearAll() {
-            if(confirm("Delete everything?")) canvas.innerHTML = "";
+        async function publish() {
+            const content = document.getElementById('main-canvas').innerHTML;
+            
+            // LOGIC FOR SAVING TO EVERYONE:
+            // In a real app, you would use:
+            // await fetch('https://your-api.com/save', { method: 'POST', body: content });
+            
+            localStorage.setItem('global_site_content', content);
+            
+            alert("🚀 SITE PUBLISHED! \n\nNote: To make this stay forever for other people, you must host this file on Netlify or Vercel and connect a Database like Supabase.");
         }
 
-        // Load content
         window.onload = () => {
-            const saved = localStorage.getItem('saved_blocks');
+            const saved = localStorage.getItem('global_site_content');
             if (saved) {
-                canvas.innerHTML = saved;
-                // Ensure everything is locked on load
-                document.querySelectorAll('.editable').forEach(el => el.contentEditable = false);
+                document.getElementById('main-canvas').innerHTML = saved;
             } else {
-                addBlock('h2', 'Welcome to your private site');
-                addBlock('p', 'Unlock the page to start building your layout.');
+                // Default Welcome
+                addBlock('text');
             }
+            refreshEditorState();
         };
     </script>
 </body>
