@@ -3,152 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UnAd-IOS</title>
-    <!-- Tailwind CSS for styling -->
+    <title>UnAd-IOS | Cloud Editor</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase Library for Database -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; transition: background 0.3s; }
+        body { font-family: 'Inter', sans-serif; }
         .block-wrapper:hover .controls { opacity: 1; transform: translateX(0); }
-        .controls { opacity: 0; transform: translateX(-10px); transition: all 0.2s; }
+        .controls { opacity: 0; transform: translateX(-10px); transition: all 0.2s; z-index: 20; }
         [contenteditable="true"]:focus { outline: none; border-bottom: 2px solid #3b82f6; }
-        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
-        .admin-active { border: 2px dashed #cbd5e1; border-radius: 1rem; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); }
+        .admin-active { border: 2px dashed #cbd5e1; border-radius: 1rem; position: relative; }
+        .no-export { display: none !important; }
+        img { max-width: 100%; height: auto; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
 
-    <!-- NAVIGATION / TOOLBAR -->
+    <!-- TOP NAVIGATION -->
     <nav class="glass border-b border-slate-200 p-4 sticky top-0 z-50 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">B</div>
-            <h1 class="font-extrabold text-slate-800 tracking-tight hidden sm:block">BLOCK<span class="text-blue-600">MASTER</span></h1>
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">U</div>
+            <h1 class="font-extrabold text-slate-800 tracking-tight">UnAd-<span class="text-blue-600">IOS</span></h1>
         </div>
 
-        <!-- Admin Only Buttons -->
-        <div id="admin-tools" class="hidden flex items-center gap-2 md:gap-6">
-            <div class="flex gap-2">
-                <button onclick="addBlock('text')" class="text-xs md:text-sm font-semibold bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50">+ Text</button>
-                <button onclick="addBlock('image')" class="text-xs md:text-sm font-semibold bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50">+ Image</button>
-                <button onclick="addBlock('button')" class="text-xs md:text-sm font-semibold bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50">+ Button</button>
+        <!-- ADMIN TOOLS (Hidden until Login) -->
+        <div id="admin-tools" class="hidden flex items-center gap-2 md:gap-4">
+            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button onclick="addBlock('text')" class="px-3 py-1 text-xs font-bold hover:bg-white rounded-lg transition">+ Text</button>
+                <button onclick="addBlock('image')" class="px-3 py-1 text-xs font-bold hover:bg-white rounded-lg transition">+ Image</button>
+                <button onclick="addBlock('button')" class="px-3 py-1 text-xs font-bold hover:bg-white rounded-lg transition">+ Button</button>
             </div>
-            <button onclick="publish()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-blue-200 transition-all active:scale-95">Publish Changes</button>
+            <button onclick="publish()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-bold shadow-md active:scale-95 transition-all">Publish</button>
         </div>
 
-        <button id="auth-btn" onclick="authenticate()" class="bg-slate-800 text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-slate-700 transition-colors">Admin Login</button>
+        <button id="auth-btn" onclick="authenticate()" class="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-slate-800 transition">Admin Login</button>
     </nav>
 
-    <!-- CONTENT CANVAS -->
-    <div id="main-canvas" class="max-w-4xl mx-auto py-16 px-6 space-y-12 min-h-screen">
-        <!-- Site content loads here -->
-        <div class="text-center py-20">
-            <p class="text-slate-400 animate-pulse">Connecting to cloud database...</p>
-        </div>
+    <!-- WEBSITE CANVAS -->
+    <div id="main-canvas" class="max-w-4xl mx-auto py-12 px-6 space-y-8 min-h-screen">
+        <div class="text-center py-20 text-slate-400">Loading Cloud Content...</div>
     </div>
 
-    <footer class="p-10 text-center text-slate-400 text-xs border-t border-slate-200">
-        &copy; 2024 BlockMaster OS • Shared Publicly via Supabase
+    <footer class="p-12 text-center text-slate-400 text-xs border-t border-slate-200 mt-20">
+        &copy; 2026 UnAd-IOS
     </footer>
 
     <script>
-        // 1. CONFIGURATION
+        // --- CONFIGURATION ---
+        // Ensure you run the SQL command in Supabase to create the 'site_data' table first!
         const SUPABASE_URL = 'https://getuxubsburhmlhjnubb.supabase.co'; 
-        const SUPABASE_KEY = 'sb_publishable_de-qzYPYoxqn9rRU4AR8mA_gAIAytad';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const SUPABASE_KEY = 'sb_publishable_de-qzYPYoxqn9rRU4AR8mA_gAIAytad'; // RE-CHECK THIS KEY!
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let isAdmin = false;
-        const SECRET = "admin123"; // Your secret password
+        const SECRET = "admin123";
 
-        // 2. LOAD DATA FROM SUPABASE
+        // --- CORE FUNCTIONS ---
+
         async function loadSite() {
-            const { data, error } = await supabase
-                .from('site_data')
-                .select('html_content')
-                .eq('id', 1)
-                .single();
-
-            if (data && data.html_content) {
+            const { data, error } = await _supabase.from('site_data').select('html_content').eq('id', 1).single();
+            if (data) {
                 document.getElementById('main-canvas').innerHTML = data.html_content;
+                refreshEditorState();
             } else {
-                document.getElementById('main-canvas').innerHTML = `
-                    <div class="block-wrapper p-4"><h1 class="text-5xl font-black text-slate-900">New Website</h1><p class="text-xl text-slate-500 mt-4">Login to start adding blocks.</p></div>
-                `;
+                document.getElementById('main-canvas').innerHTML = '<div class="text-center"><h1>Welcome. Login to start building.</h1></div>';
             }
-            refreshEditorState();
         }
 
-        // 3. ADMIN LOGIN
         function authenticate() {
             if (!isAdmin) {
-                const pass = prompt("Enter Master Password:");
+                const pass = prompt("Master Password:");
                 if (pass === SECRET) {
                     isAdmin = true;
                     document.getElementById('admin-tools').classList.remove('hidden');
                     document.getElementById('auth-btn').innerText = "Logout";
-                    document.getElementById('auth-btn').classList.replace('bg-slate-800', 'bg-red-500');
+                    document.getElementById('auth-btn').className = "bg-red-100 text-red-600 px-5 py-2 rounded-full text-sm font-bold";
                     refreshEditorState();
-                } else {
-                    alert("Wrong password!");
                 }
             } else {
                 location.reload();
             }
         }
 
-        // 4. BLOCK LOGIC
         function addBlock(type) {
-            const canvas = document.getElementById('main-canvas');
             const wrapper = document.createElement('div');
-            wrapper.className = "block-wrapper relative group p-6 rounded-2xl transition-all";
-            
-            let html = "";
+            wrapper.className = "block-wrapper p-6 transition-all";
+            let content = "";
+
             if (type === 'text') {
-                html = `<h2 class="text-3xl font-bold text-slate-800 mb-2">Editable Heading</h2>
-                        <p class="text-slate-500 leading-relaxed text-lg">Click here to edit this text block. You can add as much detail as you like.</p>`;
+                content = `<h2 class="text-4xl font-black text-slate-900 mb-4">New Headline</h2>
+                           <p class="text-slate-600 text-lg leading-relaxed">Share your story here...</p>`;
             } else if (type === 'image') {
-                const url = prompt("Enter Image URL:", "https://images.unsplash.com/photo-1498050108023-c5249f4df085");
-                html = `<img src="${url}" class="w-full rounded-2xl shadow-xl border border-slate-200">`;
+                const url = prompt("URL:", "https://source.unsplash.com/random/800x450?tech");
+                content = `<img src="${url}" class="rounded-3xl shadow-2xl w-full border border-slate-100">`;
             } else if (type === 'button') {
-                html = `<div class="flex justify-center py-4"><a href="#" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">Action Button</a></div>`;
+                content = `<div class="flex py-4"><a href="#" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-indigo-200 hover:-translate-y-1 transition">Action</a></div>`;
             }
 
             wrapper.innerHTML = `
                 <div class="controls absolute -left-12 top-4 flex flex-col gap-2 no-export">
-                    <button onclick="this.closest('.block-wrapper').remove()" class="w-8 h-8 bg-white border border-red-100 shadow-sm rounded-full flex items-center justify-center text-red-500 hover:bg-red-50">✕</button>
+                    <button onclick="this.closest('.block-wrapper').remove()" class="w-8 h-8 bg-white shadow-md rounded-full text-red-500">✕</button>
                 </div>
-                <div class="content-area">${html}</div>
-            `;
-            canvas.appendChild(wrapper);
+                <div class="content-area">${content}</div>`;
+            
+            document.getElementById('main-canvas').appendChild(wrapper);
             refreshEditorState();
         }
 
-        // 5. SYNCING
         function refreshEditorState() {
-            const contentAreas = document.querySelectorAll('.content-area > *');
-            contentAreas.forEach(el => {
+            // Apply editability to all direct children of content areas
+            document.querySelectorAll('.content-area > *').forEach(el => {
                 el.contentEditable = isAdmin;
             });
             
-            // Visual cues for admin
-            const wrappers = document.querySelectorAll('.block-wrapper');
-            wrappers.forEach(w => isAdmin ? w.classList.add('admin-active') : w.classList.remove('admin-active'));
+            // Show/Hide admin-only visual cues
+            document.querySelectorAll('.block-wrapper').forEach(w => {
+                isAdmin ? w.classList.add('admin-active') : w.classList.remove('admin-active');
+                const controls = w.querySelector('.controls');
+                if (controls) isAdmin ? controls.classList.remove('no-export') : controls.classList.add('no-export');
+            });
         }
 
         async function publish() {
             if (!isAdmin) return;
             
-            // Clean up UI before saving (hide controls)
-            const canvasClone = document.getElementById('main-canvas').cloneNode(true);
-            const content = canvasClone.innerHTML;
+            // 1. Temporarily strip admin UI for a clean save
+            const canvas = document.getElementById('main-canvas');
+            isAdmin = false;
+            refreshEditorState();
 
-            const { error } = await supabase
-                .from('site_data')
-                .upsert({ id: 1, html_content: content });
+            const cleanHTML = canvas.innerHTML;
 
-            if (error) alert("Error: " + error.message);
-            else alert("🎉 Published! Your site is live for everyone.");
+            const { error } = await _supabase.from('site_data').upsert({ id: 1, html_content: cleanHTML });
+
+            // 2. Restore Admin UI
+            isAdmin = true;
+            refreshEditorState();
+
+            if (error) alert("Sync Error: " + error.message);
+            else alert("🚀 GLOBAL UPDATE SUCCESSFUL!");
         }
 
         window.onload = loadSite;
