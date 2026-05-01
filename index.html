@@ -3,79 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Web Editor</title>
+    <title>Private Block Editor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #editor-canvas:focus { outline: none; }
-        .toolbar-btn {
-            @apply p-2 hover:bg-gray-700 rounded transition-colors text-white font-bold;
-        }
+        .block-item:hover .block-controls { opacity: 1; }
+        [contenteditable="true"]:focus { outline: none; border-left: 2px solid #3b82f6; padding-left: 10px; }
+        .drag-handle { cursor: grab; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-900">
 
-    <!-- Sticky Toolbar -->
-    <nav class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50 shadow-xl">
-        <div class="max-w-5xl mx-auto flex flex-wrap items-center gap-4">
-            <h1 class="text-xl font-black tracking-tighter mr-6 text-blue-400">EDIT_OS</h1>
-            
-            <div class="flex bg-gray-900 rounded-lg p-1 border border-gray-600">
-                <button onclick="execCmd('bold')" class="toolbar-btn" title="Bold">B</button>
-                <button onclick="execCmd('italic')" class="toolbar-btn italic" title="Italic">I</button>
-                <button onclick="execCmd('underline')" class="toolbar-btn underline" title="Underline">U</button>
-            </div>
-
-            <div class="flex bg-gray-900 rounded-lg p-1 border border-gray-600">
-                <button onclick="execCmd('justifyLeft')" class="toolbar-btn">Left</button>
-                <button onclick="execCmd('justifyCenter')" class="toolbar-btn">Center</button>
-                <button onclick="execCmd('justifyRight')" class="toolbar-btn">Right</button>
-            </div>
-
-            <button onclick="saveContent()" class="ml-auto bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-full font-bold transition-all shadow-lg shadow-blue-900/20">
-                Save Changes
-            </button>
+    <!-- Admin Bar -->
+    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 flex justify-between items-center px-6 shadow-lg">
+        <div class="flex items-center gap-4">
+            <span class="font-bold tracking-widest text-blue-400">BLOCK_EDIT</span>
+            <span id="status-tag" class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-400">VIEW ONLY</span>
+        </div>
+        
+        <div class="flex gap-3">
+            <button id="lock-btn" onclick="toggleLock()" class="bg-slate-700 hover:bg-slate-600 px-4 py-1 rounded text-sm transition">Unlock to Edit</button>
+            <button id="save-btn" onclick="saveData()" class="hidden bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded text-sm font-bold">Save Page</button>
         </div>
     </nav>
 
-    <!-- Editable Area -->
-    <main class="flex-grow p-8">
-        <div 
-            id="editor-canvas" 
-            contenteditable="true" 
-            class="max-w-4xl mx-auto bg-white text-gray-800 p-12 min-h-[60vh] rounded-2xl shadow-2xl overflow-hidden"
-        >
-            <h2 class="text-4xl font-bold mb-4">Click anywhere to start editing!</h2>
-            <p class="text-lg text-gray-600">You can highlight text to style it, delete this paragraph, or even paste images. Everything inside this white box is live-editable.</p>
-            <br>
-            <div class="p-6 bg-blue-50 border-l-4 border-blue-500 rounded">
-                <p class="italic text-blue-700">"This is a pre-styled block. You can change the text here too!"</p>
-            </div>
-        </div>
-    </main>
+    <!-- Block Toolbar (Hidden by default) -->
+    <div id="toolbar" class="hidden bg-white border-b border-slate-200 p-2 sticky top-[52px] z-40 justify-center gap-2 shadow-sm">
+        <button onclick="addBlock('h2')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Heading</button>
+        <button onclick="addBlock('p')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Paragraph</button>
+        <button onclick="addBlock('img')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-sm">+ Image URL</button>
+        <button onclick="clearAll()" class="px-3 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded text-sm">Clear All</button>
+    </div>
 
-    <!-- Footer Stats -->
-    <footer class="p-4 text-center text-gray-500 text-sm">
-        Mode: <span class="text-green-400">Live Edit</span> | Powered by Gemini
-    </footer>
+    <!-- Main Content -->
+    <div id="canvas" class="max-w-3xl mx-auto mt-12 p-6 min-h-screen">
+        <!-- Blocks will be injected here -->
+    </div>
 
     <script>
-        // Function to execute editor commands
-        function execCmd(command) {
-            document.execCommand(command, false, null);
+        let isLocked = true;
+        const canvas = document.getElementById('canvas');
+        const lockBtn = document.getElementById('lock-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const toolbar = document.getElementById('toolbar');
+        const statusTag = document.getElementById('status-tag');
+
+        // Simple "Secret" - Change 'admin123' to your preferred password
+        const SECRET_KEY = "admin123";
+
+        function toggleLock() {
+            if (isLocked) {
+                const pass = prompt("Enter Admin Password:");
+                if (pass === SECRET_KEY) {
+                    isLocked = false;
+                    unlockEditor();
+                } else {
+                    alert("Access Denied");
+                }
+            } else {
+                isLocked = true;
+                lockEditor();
+            }
         }
 
-        // Save functionality (to local storage)
-        function saveContent() {
-            const content = document.getElementById('editor-canvas').innerHTML;
-            localStorage.setItem('web_content', content);
-            alert('Progress saved to your browser cache!');
+        function unlockEditor() {
+            lockBtn.innerText = "Lock Editor";
+            lockBtn.classList.replace('bg-slate-700', 'bg-red-900');
+            saveBtn.classList.remove('hidden');
+            toolbar.classList.add('flex');
+            statusTag.innerText = "EDIT MODE";
+            statusTag.classList.replace('bg-slate-700', 'bg-green-900');
+            statusTag.classList.replace('text-slate-400', 'text-green-100');
+            
+            document.querySelectorAll('.editable').forEach(el => el.contentEditable = true);
         }
 
-        // Load saved content on refresh
+        function lockEditor() {
+            location.reload(); // Simplest way to reset state
+        }
+
+        function addBlock(type, content = "") {
+            const div = document.createElement('div');
+            div.className = "block-item group relative mb-4";
+            
+            let innerHTML = "";
+            if (type === 'h2') innerHTML = `<h2 class="editable text-3xl font-bold" contenteditable="true">${content || "New Heading"}</h2>`;
+            if (type === 'p') innerHTML = `<p class="editable text-slate-600 leading-relaxed" contenteditable="true">${content || "Type your story here..."}</p>`;
+            if (type === 'img') {
+                const url = content || prompt("Enter Image URL:", "https://images.unsplash.com/photo-1498050108023-c5249f4df085");
+                innerHTML = `<img src="${url}" class="rounded-xl shadow-lg my-4 w-full">`;
+            }
+
+            div.innerHTML = `
+                ${innerHTML}
+                <div class="block-controls opacity-0 absolute -left-12 top-0 flex flex-col gap-1 transition-opacity">
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-red-400 hover:text-red-600 text-xs">Del</button>
+                </div>
+            `;
+            canvas.appendChild(div);
+        }
+
+        function saveData() {
+            const data = canvas.innerHTML;
+            localStorage.setItem('saved_blocks', data);
+            alert("Site layout saved locally!");
+        }
+
+        function clearAll() {
+            if(confirm("Delete everything?")) canvas.innerHTML = "";
+        }
+
+        // Load content
         window.onload = () => {
-            const saved = localStorage.getItem('web_content');
+            const saved = localStorage.getItem('saved_blocks');
             if (saved) {
-                document.getElementById('editor-canvas').innerHTML = saved;
+                canvas.innerHTML = saved;
+                // Ensure everything is locked on load
+                document.querySelectorAll('.editable').forEach(el => el.contentEditable = false);
+            } else {
+                addBlock('h2', 'Welcome to your private site');
+                addBlock('p', 'Unlock the page to start building your layout.');
             }
         };
     </script>
